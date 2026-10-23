@@ -1,56 +1,157 @@
-# AI Prompt Governance Kit
+# VIBESHIFT AI (PERSONASHIFT AI)
 
-Every prompt a member types to an AI assistant in this repo is logged word for word (never the AI's response) to `.ai-analytics/<member>.jsonl`, committed with their work, and categorized on a fixed rubric. `REPORT.md` summarizes it per member.
+**VibeShift** is a real-time AI-powered communication transformation platform that refashions rough message drafts into three tailored, persona-aligned rewrites for any audience, tone, channel, length, and language—while strictly preserving meaning, commitments, dates, and factual integrity.
 
-## Setup
+---
 
-**Repo owner, once:**
-1. Put the zip in your project folder, open the project in Claude Code or Copilot (agent mode), and type:
-   `Unzip ai-prompt-governance-kit.zip into the project root, keeping hidden files, then delete the zip.`
-2. Commit and push everything.
-3. Start a new AI chat. The AI asks for your email, project name and GitHub username, and finishes the setup itself. Commit and push again.
-4. On GitHub → Settings → Rules → Rulesets, add a ruleset for `main`: require a pull request, require review from Code Owners, require the `check` status check, block force pushes, restrict deletions, and **leave the bypass list empty** so the rules apply to the owner too. (The AI can't do this step for you.)
+## 1. Project Overview & Features
 
-**Each member, once:** pull the latest code and open the project in Claude Code or Copilot. In the first AI chat, the AI asks for their email and sets everything up. After that the setup check finishes instantly and stays silent. (Python 3.10+ must be installed.)
+- **Strict Meaning Preservation**: Enforces 11 core factual rules to prevent hallucination, altered deadlines, invented commitments, or lost uncertainties.
+- **Three Distinct Rewrite Options**: Every generation delivers exactly three differentiated variations (e.g. Recommended / Balanced, More Diplomatic, Crisp / Concise).
+- **Communication Insights & Meaning Review**: AI-driven evaluation of tone shift, clarity, directness, audience fit, key changes, and a factual preservation checklist.
+- **Comprehensive Persona Controls**:
+  - **Tones**: `Professional`, `Friendly`, `Diplomatic`, `Generic`, `Custom` (with up to 300-char style prompt).
+  - **Audiences**: `Manager`, `Professor`, `Teacher`, `Friend`, `Executive / C-Level`, `Legal / Compliance`.
+  - **Channels**: `Email`, `Chat / Direct Message`, `Announcement`, `Feedback`.
+  - **Presets**: `Executive C-Level` (crisp, outcome-first, max 3 lines), `Supportive Peer` (constructive warmth without sugarcoating), `Legal / Compliance` (formal risk-conscious phrasing without giving legal advice), `Gen-Z Hype` (casual, authentic energy).
+  - **Lengths**: `Shorter`, `Same`, `Longer`, with optional `targetWords` (1–2,000 words).
+  - **Languages**: `English`, `Hindi`, `Hinglish` (Latin code-switching), `Spanish`, `French`, `German`, `Arabic`, `Japanese`.
+- **Client-Side Word-Level Diff & Metrics**: Deterministic jsdiff word comparison calculating added/removed words, length delta, change percentage, and lexical similarity without trusting synthetic scores.
+- **Robust Security & Validation**: Zod-based server validation, 100KB body limit, 2,000-word draft limit, rate limiting, and defensive JSON parsing that strips markdown fences.
 
-Setup is remembered per member and per copy of the project (in `.git/ai-governance-ready`). The rules in `AGENTS.md` are still loaded by the IDE in every chat; that is automatic and needs nothing from anyone.
+---
 
-## How the rules are enforced
-| Rule | Claude Code | GitHub Copilot (VS Code agent, Copilot CLI) | Cursor, Codex, others |
-|---|---|---|---|
-| Log every prompt, word for word | Hook (automatic) | Hook (automatic) | Instruction in `AGENTS.md` only |
-| AI can't edit logs or governance files | Hook blocks it | Hook blocks it | Instruction only |
-| Ask before `git push` | Hook asks | Hook asks | Instruction only |
-| No one (owner included) can change or delete a logged prompt | Hook blocks the AI and logs the attempt | Hook blocks the AI and logs the attempt | Instruction only |
-| Same, for edits made by hand | Pre-commit hook blocks the commit; CI fails the PR and opens a "tampering" issue | same | same |
-| Rule files can't change without admin | CODEOWNERS review | CODEOWNERS review | CODEOWNERS review |
-| Other rules in `AGENTS.md` (prompt-injection, code quality) | Instruction | Instruction | Instruction |
+## 2. Technology Stack & Architecture
 
-Hooks live in `.claude/settings.json` (Claude Code; Copilot reads it too) and `.github/hooks/ai-governance.json` (Copilot). If both fire for one prompt, it is logged once.
+- **Frontend**: React 18, Vite 6, Tailwind CSS 3, Lucide React icons.
+- **Backend**: Node.js (v20+ / v24), Express 4 (ES Modules).
+- **AI Provider**: Google Gemini via official `@google/genai` SDK (`gemini-2.5-flash` default).
+- **Validation**: Zod 3.
+- **Diff & Comparison**: `diff` (jsdiff).
+- **Testing**: Built-in `node:test` runner (33 automated unit and integration tests).
 
-## Fixed rubric (5 categories + other)
-Defined in `ai-governance.json` → `categories`, in this priority order:
-`code_push_to_github`, `code_deletion`, `code_review`, `brainstorming`, `code_generation`.
-- Most keyword hits wins; a tie goes to the category listed first.
-- A prompt gets exactly one category.
-- No hits → `other` (e.g. "fix this bug", "explain this"). Add keywords if too many prompts land here.
+```
+undefined-core/
+├── API_CONTRACT.md              # Shared contract between frontend and backend
+├── HANDOFF.md                   # Developer handoff log
+├── README.md                    # Project documentation
+├── package.json                 # Project configuration and dependencies
+├── vite.config.js               # Vite configuration with /api proxy to Express
+├── .env.example                 # Environment variable template
+├── server/
+│   ├── src/
+│   │   ├── index.js             # Express app setup, rate limiting, error handling (Port 5000)
+│   │   ├── routes/
+│   │   │   ├── health.js        # GET /api/health
+│   │   │   └── rewrite.js       # POST /api/rewrite
+│   │   └── lib/
+│   │       ├── llm.js           # Google GenAI client, error mapping, fallback
+│   │       ├── prompt.js        # Prompt engineering & meaning-preservation rules
+│   │       └── schema.js        # Zod validation schemas
+│   └── test/
+│       ├── api.test.js          # HTTP integration tests
+│       ├── diff_metrics.test.js # Word diff and change metrics tests
+│       ├── integration_frontend.test.js # Full-stack frontend contract tests
+│       ├── llm.test.js          # JSON parsing and error handling tests
+│       ├── prompt.test.js       # Prompt builder tests
+│       └── schema.test.js       # Zod schema validation tests
+└── src/
+    ├── components/              # React UI components (VersionCard, OutputPanel, etc.)
+    ├── pages/                   # Application pages (WritePage, HistoryPage, AboutPage)
+    ├── lib/
+    │   ├── api.js               # Frontend API client
+    │   ├── diff.js              # Word-level diff comparison
+    │   └── metrics.js           # Change percent and lexical similarity
+    └── services/
+        └── rewriteApi.js        # Alternative client fetch wrapper
+```
 
-## Report
-`python3 scripts/log_prompt.py report --out .ai-analytics/REPORT.md`, then commit it. It has a per-member summary table, then every prompt per member with time, tool and category (prompts over 300 characters are cut in the report; the full text stays in the `.jsonl`).
+---
 
-## Why the logs can't be changed silently
-- Each log line stores the hash of the line before it. Changing or deleting any earlier line breaks the chain, and both `verify` and `REPORT.md` show **Log integrity: FAILED**.
-- CI compares every PR and every push to `main` against the previous version and fails if any existing line changed. It then opens a GitHub issue naming who did it.
-- The CI check runs from the `main` branch's copy of the workflow and script, so a PR can't switch the check off by editing them.
-- Attempts the hooks block are written to the log as `blocked_change` events and listed in `REPORT.md`.
+## 3. Prerequisites
 
-## Things to know
-- The repo owner controls the GitHub settings, so in the end they *can* turn rules off, delete issues or rewrite history. What this kit guarantees is that it can't be done **silently**: every member's clone keeps the old history, and `python3 scripts/log_prompt.py verify --base <old commit>` in any clone shows exactly what changed. For proof the owner can't touch, have someone outside the repo (e.g. a faculty mentor) keep a clone or periodically download the logs.
-- What no IDE can enforce: a member can switch hooks off on their own machine, use an AI tool without hooks, or not commit their log. CI warns when a PR has no new log lines; treat that as a question to ask, not as proof AI wasn't used.
-- The VS Code hooks feature is in Preview and an organization policy can disable it, so do step 5 of setup.
-- Copilot inline autocomplete (grey suggestions while typing) has no prompt and is not logged.
-- Full prompt text is stored and committed, so it stays in git history permanently and anyone with repo access can read it. Secrets matching common patterns (passwords, API keys, tokens, private keys) are redacted first, but redaction is best-effort: tell members never to paste secrets or personal data into prompts. Set `store_prompt_text` to `false` to keep categories only.
-- `.gitattributes` uses `merge=union`, so log files don't conflict when branches merge.
-- Identity is whatever each member puts in git config, and members can skip committing their log. Missing logs mean missing data, not zero AI use.
-- Spot-check 20–30 entries against the rubric before trusting the numbers.
-- `AGENTS.md` is the source of truth; copy its body into `.github/copilot-instructions.md` after edits (a test checks this).
+- **Node.js**: `v20.0.0` or higher (tested on Node v24.20.0).
+- **npm**: `v10.0.0` or higher.
+- **Google Gemini API Key**: From [Google AI Studio](https://aistudio.google.com/).
+
+---
+
+## 4. Installation & Environment Setup
+
+1. **Clone the repository and switch to the working branch:**
+   ```bash
+   git clone https://github.com/goyalanshika2507-dot/undefined-core.git
+   cd undefined-core
+   git checkout feat/backend-api
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and provide your Google Gemini API key:
+   ```env
+   LLM_API_KEY=your_actual_gemini_api_key_here
+   PORT=5000
+   # LLM_MODEL=gemini-2.5-flash
+   ```
+   *Note: Never commit your `.env` file or API keys to Git.*
+
+---
+
+## 5. Running the Application
+
+### Start the Backend Server (Port 5000)
+```bash
+npm run server
+```
+For auto-reload during development:
+```bash
+npm run server:dev
+```
+- Health check: `http://localhost:5000/api/health`
+- Rewrite endpoint: `http://localhost:5000/api/rewrite`
+
+### Start Frontend (Vite on Port 5173)
+```bash
+npm run dev
+```
+Open `http://localhost:5173` in your browser. All `/api` requests are automatically proxied to the Express backend.
+
+---
+
+## 6. Running Automated Tests
+
+Run the full automated test suite (33 tests across schema, prompt, parser, diff, api, and frontend integration):
+```bash
+npm test
+```
+
+To run tests in mock mode without consuming Gemini API quota:
+```bash
+MOCK_LLM=true npm test
+```
+
+---
+
+## 7. Building for Production
+
+```bash
+npm run build
+```
+Generates production assets in `dist/`.
+
+---
+
+## 8. Handoff & Team Workflow
+
+- **Shared Working Branch**: `feat/backend-api`
+- **Initial Backend**: Shreya
+- **Backend Continuation & Integration**: Dilbahar
+- **Frontend**: Agrim (independently implemented and merged from `frontend` branch)
+- **Integration Coordination & QA**: Anshika
