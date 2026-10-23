@@ -1,23 +1,66 @@
-import { computeWordDiff } from './diff.js';
+import { calculateDiff, countWords, countCharacters, computeWordDiff } from './diff.js';
+
+export { countWords, countCharacters };
 
 /**
- * Counts whitespace-delimited words in a string.
- * @param {string} text
- * @returns {number}
+ * Calculates complete change metrics between original and rewritten text.
+ * Used directly by frontend components (ChangeMetrics, VersionCard, ComparisonPanel).
+ * 
+ * @param {string} original 
+ * @param {string} rewritten 
+ * @returns {object}
  */
-export function countWords(text) {
-  if (!text || typeof text !== 'string') return 0;
-  return text.trim().split(/\s+/).filter(Boolean).length;
+export function calculateMetrics(original = '', rewritten = '') {
+  const diffResult = calculateDiff(original, rewritten);
+  const origWords = diffResult.originalWordCount;
+  const rewWords = diffResult.rewrittenWordCount;
+  const wordDiff = diffResult.wordDifference;
+  const addedWords = diffResult.addedWords;
+  const removedWords = diffResult.removedWords;
+
+  // Format length difference label: e.g. "+14 words", "-8 words", "0 words"
+  let lengthDiffLabel = '0 words';
+  if (wordDiff > 0) {
+    lengthDiffLabel = `+${wordDiff} words`;
+  } else if (wordDiff < 0) {
+    lengthDiffLabel = `${wordDiff} words`;
+  }
+
+  // Reading time estimate (average 200 words per minute)
+  const readingTimeSec = Math.max(1, Math.round((rewWords / 200) * 60));
+
+  return {
+    originalWordCount: origWords,
+    rewrittenWordCount: rewWords,
+    originalCharCount: countCharacters(original),
+    rewrittenCharCount: countCharacters(rewritten),
+    lengthDifference: wordDiff,
+    lengthDiffLabel,
+    addedWords,
+    removedWords,
+    changePercentage: diffResult.changePercentage,
+    readingTimeSeconds: readingTimeSec,
+  };
+}
+
+/**
+ * Validates whether change percentage is within typical modification bounds.
+ * @param {number} percentage 
+ * @returns {string} description
+ */
+export function getChangeIntensity(percentage) {
+  if (percentage <= 15) return 'Minimal Polish';
+  if (percentage <= 35) return 'Moderate Restructure';
+  if (percentage <= 65) return 'Substantial Shift';
+  return 'Complete Rewrite';
 }
 
 /**
  * Calculates deterministic lexical change metrics from actual text comparison.
- *
  * Formula:
  * changePercent = 100 * (addedWordCount + removedWordCount) / Math.max(originalWordCount, 1)
  *
- * Note: Lexical similarity reflects surface word-overlap and MUST NOT be conflated
- * with semantic or factual equivalence.
+ * Backwards-compatible helper for automated backend tests.
  *
  * @param {string} originalText
  * @param {string} rewrittenText
