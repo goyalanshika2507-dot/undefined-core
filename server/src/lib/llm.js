@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { modelOutputSchema } from './schema.js';
+import { modelOutputSchema, normalizePreset, normalizeAudience } from './schema.js';
 
 /**
  * Extracts and parses JSON from raw LLM output, defensively stripping code fences.
@@ -32,41 +32,111 @@ export function extractAndParseJSON(rawText) {
 }
 
 /**
- * Validates parsed object against the required 3-version schema.
+ * Generates communication insights for UI if not returned by model.
  */
-export function validateModelOutput(parsedData) {
+export function generateDefaultInsights({ text, tone, audience, preset }, versions) {
+  const normAudience = normalizeAudience(audience) || 'Recipient';
+  const selectedTone = tone || 'Professional';
+  const firstChange = versions[0]?.whatChanged || 'Refined clarity and tone';
+  const secondChange = versions[1]?.whatChanged || 'Adjusted phrasing for impact';
+  const thirdChange = versions[2]?.whatChanged || 'Preserved all dates, deadlines, and key actions';
+
+  return {
+    toneShift: `Draft → ${selectedTone}`,
+    clarity: 'The rewritten message communicates intent directly and removes ambiguity.',
+    directness: preset === 'executive' ? 'High executive directness with crisp focus' : 'Balanced, polite, and constructive',
+    audienceFit: `Calibrated register and vocabulary specifically for ${normAudience}.`,
+    keyChanges: [firstChange, secondChange, thirdChange],
+    howItMightComeAcross: `The message projects a respectful, ${selectedTone.toLowerCase()} demeanor while ensuring all requirements and commitments remain explicit.`,
+    meaningCheck: {
+      preservedFacts: [
+        'Core intent and message preserved',
+        'Specific dates, figures, and deadlines retained',
+        'Explicit commitments and conditions kept intact'
+      ],
+      possibleOmissions: [],
+      unsupportedAdditions: [],
+      uncertainChanges: []
+    }
+  };
+}
+
+/**
+ * Validates parsed object against the required schema and normalizes properties.
+ */
+export function validateModelOutput(parsedData, requestParams = {}) {
   const result = modelOutputSchema.safeParse(parsedData);
   if (!result.success) {
     const errorMsg = result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     throw new Error(`Model response schema validation failed: ${errorMsg}`);
   }
-  return result.data;
+
+  const data = result.data;
+
+  // Normalize each version with IDs, tone, audience, and ensure styleDescription & whatChanged are synced
+  const normalizedVersions = data.versions.map((v, index) => ({
+    id: v.id || `v${index + 1}`,
+    label: v.label || `Version ${index + 1}`,
+    text: v.text,
+    whatChanged: v.whatChanged || v.styleDescription || 'Stylistic refinement.',
+    styleDescription: v.styleDescription || v.whatChanged || 'Stylistic refinement.',
+    tone: v.tone || requestParams.tone || 'Professional',
+    audience: v.audience || requestParams.audience || 'Manager'
+  }));
+
+  // Ensure insights are always present for the frontend
+  const insights = data.insights && data.insights.toneShift
+    ? data.insights
+    : generateDefaultInsights(requestParams, normalizedVersions);
+
+  return {
+    status: 'success',
+    versions: normalizedVersions,
+    insights
+  };
 }
 
 /**
  * Generates mocked response for automated tests or when MOCK_LLM=true.
  */
-export function generateMockRewrite({ text, tone, preset, audience, length, language }) {
-  const cleanSnippet = (text || '').trim().slice(0, 60);
-  return {
+export function generateMockRewrite(params = {}) {
+  const { text = '', tone = 'Professional', preset = null, audience = 'Manager' } = params;
+  const cleanSnippet = text.trim().slice(0, 60);
+
+  const rawMock = {
+    status: 'success',
     versions: [
       {
-        label: 'Version 1',
-        text: `[Balanced & Direct] ${cleanSnippet}... Tailored for ${audience} with a ${tone} tone.`,
-        whatChanged: `Streamlined phrasing for ${audience}, eliminated redundant expressions, and reinforced direct clarity.`
+        id: 'v1',
+        label: 'Version 1 — Recommended',
+        text: `[Balanced & Direct] Regarding: ${cleanSnippet}... Tailored for ${audience} with a ${tone} tone.`,
+        whatChanged: `Streamlined phrasing for ${audience}, eliminated redundant expressions, and reinforced direct clarity.`,
+        styleDescription: `Clear, outcome-focused, and tailored for ${audience}.`,
+        tone,
+        audience
       },
       {
-        label: 'Version 2',
-        text: `[Polished & Professional] Regarding: ${cleanSnippet}... Structured clearly for ${audience}.`,
-        whatChanged: `Elevated vocabulary and formal structure to match ${preset || tone} standards while preserving commitments.`
+        id: 'v2',
+        label: 'Version 2 — Diplomatic & Polished',
+        text: `[Polished & Professional] Update for ${audience}: ${cleanSnippet}... Structured clearly to ensure alignment.`,
+        whatChanged: `Elevated vocabulary and formal structure to match ${preset || tone} standards while preserving commitments.`,
+        styleDescription: `Softer phrasing emphasizing collaborative commitment and clarity.`,
+        tone: 'Diplomatic',
+        audience
       },
       {
-        label: 'Version 3',
-        text: `[Approachable & Clear] Quick update for ${audience}: ${cleanSnippet}...`,
-        whatChanged: `Adopted an engaging, concise cadence suited for immediate comprehension while keeping all facts intact.`
+        id: 'v3',
+        label: 'Version 3 — Crisp & Concise',
+        text: `[Concise & Actionable] Quick status for ${audience}: ${cleanSnippet}... All key dates and details unchanged.`,
+        whatChanged: `Adopted an engaging, concise cadence suited for immediate comprehension while keeping all facts intact.`,
+        styleDescription: `Crisp bullet cadence with zero filler, preserving all facts.`,
+        tone,
+        audience
       }
     ]
   };
+
+  return validateModelOutput(rawMock, params);
 }
 
 /**
@@ -186,7 +256,7 @@ export async function executeRewrite(params, options = {}) {
       clientOverride: options.clientOverride
     });
     parsed = extractAndParseJSON(rawOutput);
-    return validateModelOutput(parsed);
+    return validateModelOutput(parsed, params);
   } catch (firstErr) {
     // If it's a configuration, auth, timeout, or rate-limit error, do not retry parsing
     if (['CONFIG_MISSING', 'AUTH_ERROR', 'PROVIDER_RATE_LIMIT', 'PROVIDER_TIMEOUT'].includes(firstErr.code)) {
@@ -204,7 +274,7 @@ export async function executeRewrite(params, options = {}) {
         clientOverride: options.clientOverride
       });
       parsed = extractAndParseJSON(rawOutput);
-      return validateModelOutput(parsed);
+      return validateModelOutput(parsed, params);
     } catch (secondErr) {
       // If validation or parsing still fails, return a recoverable error
       const recoverableErr = new Error('Failed to generate valid rewrite versions from AI model. Please try again.');

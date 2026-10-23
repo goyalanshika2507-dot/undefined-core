@@ -7,7 +7,8 @@ import healthRouter from './routes/health.js';
 import rewriteRouter from './routes/rewrite.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// Default to port 5000 matching frontend DEFAULT_API_BASE_URL (http://localhost:5000/api)
+const PORT = process.env.PORT || 5000;
 
 // Trust reverse proxy headers if behind one
 app.set('trust proxy', 1);
@@ -31,7 +32,8 @@ const apiLimiter = rateLimit({
     error: {
       code: 'RATE_LIMIT_EXCEEDED',
       message: 'Too many requests from this IP. Please try again after a few minutes.'
-    }
+    },
+    message: 'Too many requests from this IP. Please try again after a few minutes.'
   }
 });
 
@@ -48,7 +50,8 @@ app.use((req, res) => {
     error: {
       code: 'NOT_FOUND',
       message: `The requested endpoint '${req.method} ${req.originalUrl}' does not exist.`
-    }
+    },
+    message: `The requested endpoint '${req.method} ${req.originalUrl}' does not exist.`
   });
 });
 
@@ -60,7 +63,8 @@ app.use((err, req, res, next) => {
       error: {
         code: 'PAYLOAD_TOO_LARGE',
         message: 'Request body exceeds the maximum permitted limit of 100KB.'
-      }
+      },
+      message: 'Request body exceeds the maximum permitted limit of 100KB.'
     });
   }
 
@@ -70,7 +74,8 @@ app.use((err, req, res, next) => {
       error: {
         code: 'INVALID_JSON',
         message: 'Malformed JSON payload provided in request body.'
-      }
+      },
+      message: 'Malformed JSON payload provided in request body.'
     });
   }
 
@@ -80,7 +85,8 @@ app.use((err, req, res, next) => {
     error: {
       code: err.code || 'INTERNAL_SERVER_ERROR',
       message: 'An unexpected server error occurred.'
-    }
+    },
+    message: 'An unexpected server error occurred.'
   });
 });
 
@@ -88,9 +94,9 @@ app.use((err, req, res, next) => {
 const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isDirectRun) {
   app.listen(PORT, () => {
-    console.log(`[PERSONASHIFT AI] Server running on http://localhost:${PORT}`);
-    console.log(`[PERSONASHIFT AI] Health check: http://localhost:${PORT}/api/health`);
-    console.log(`[PERSONASHIFT AI] LLM status: ${process.env.LLM_API_KEY ? 'Configured' : 'Missing LLM_API_KEY'}`);
+    console.log(`[VibeShift AI] Server running on http://localhost:${PORT}`);
+    console.log(`[VibeShift AI] Health check: http://localhost:${PORT}/api/health`);
+    console.log(`[VibeShift AI] LLM status: ${process.env.LLM_API_KEY ? 'Configured' : 'Missing LLM_API_KEY'}`);
   });
 }
 

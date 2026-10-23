@@ -1,6 +1,6 @@
-# PERSONASHIFT AI — Shared API Contract
+# VibeShift AI — Shared Full-Stack API Contract
 
-This document defines the interface contract between the React frontend (owned by Agrim), the Node.js/Express backend (implemented by Shreya, continued by Dilbahar), and integration testing (coordinated by Anshika).
+This document defines the unified interface contract between the React frontend (developed by Agrim), the Node.js/Express backend (implemented by Shreya & Dilbahar), and integration testing (coordinated by Anshika).
 
 ---
 
@@ -9,7 +9,7 @@ This document defines the interface contract between the React frontend (owned b
 | Method | Endpoint | Description | Auth |
 | :--- | :--- | :--- | :--- |
 | `GET` | `/api/health` | Service health check and safe LLM configuration status | None |
-| `POST` | `/api/rewrite` | Transform a text draft into exactly 3 stylistic rewrites | None (browser calls server) |
+| `POST` | `/api/rewrite` | Transform a text draft into exactly 3 stylistic rewrites + communication insights | None (browser calls server) |
 
 ---
 
@@ -26,7 +26,7 @@ This document defines the interface contract between the React frontend (owned b
 }
 ```
 
-*Note: The API key is never exposed in the response.*
+*Security guarantee: The API key and secrets are NEVER returned.*
 
 ---
 
@@ -34,44 +34,36 @@ This document defines the interface contract between the React frontend (owned b
 
 ### `POST /api/rewrite`
 
-#### Request Headers
-```http
-Content-Type: application/json
-Accept: application/json
-```
-
 #### Request Body Schema
+The backend accepts both backend-native and frontend-form payloads transparently:
+
 ```json
 {
-  "text": "The original rough draft (required, 1-2000 words)",
+  "message": "The original rough draft (or field name 'text')",
   "tone": "Professional",
   "customTone": "",
-  "audience": "Manager",
-  "channel": "Email",
-  "preset": "executive",
-  "length": "shorter",
-  "targetWordLimit": 40,
+  "audience": "Executive / C-Level",
+  "channel": "Chat / Direct Message",
+  "preset": "Executive C-Level",
+  "length": "Shorter",
+  "targetWords": 35,
   "language": "English"
 }
 ```
 
-#### Field Specifications
+#### Field Specifications & Compatibility Aliases
 
-| Field | Type | Required | Allowed Values / Constraints | Default |
-| :--- | :--- | :--- | :--- | :--- |
-| `text` | string | **Yes** | 1 to 2,000 words; cannot be empty or whitespace only. | None |
-| `tone` | string | No | `Professional`, `Friendly`, `Diplomatic`, `Generic`, `Custom` | `Professional` |
-| `customTone` | string | Conditional | Required when `tone === 'Custom'` (1-300 characters). Ignored otherwise. | `""` |
-| `audience` | string | No | `Manager`, `Professor`, `Teacher`, `Friend`, `Executive/C-Level`, `Legal/Compliance` | `Manager` |
-| `channel` | string | No | `Email`, `Chat`, `Announcement`, `Feedback` | `Email` |
-| `preset` | string \| null | No | `executive`, `supportive`, `legal`, `genz`, or `null` | `null` |
-| `length` | string | No | `shorter`, `same`, `longer` | `same` |
-| `targetWordLimit`| integer | No | Positive integer between 1 and 2,000 | None |
-| `language` | string | No | `English`, `Hindi`, `Hinglish`, `Spanish`, `French`, `German`, `Arabic`, `Japanese` | `English` |
-
-*Notes:*
-- Presets take precedence over conflicting general tone/audience choices, but length and language remain strictly enforced.
-- When `targetWordLimit` is supplied, it serves as a soft target: essential facts, commitments, and dates are never dropped merely to satisfy word count.
+| Field | Primary / Alias | Constraints | Default |
+| :--- | :--- | :--- | :--- |
+| **Draft** | `text` or `message` | 1 to 2,000 words; non-empty. | *Required* |
+| **Tone** | `tone` | `Professional`, `Friendly`, `Diplomatic`, `Generic`, `Custom` | `Professional` |
+| **Custom Tone**| `customTone` | 1-300 characters when `tone === 'Custom'` | `""` |
+| **Audience** | `audience` | `Manager`, `Professor`, `Teacher`, `Friend`, `Executive/C-Level` (`Executive / C-Level`), `Legal/Compliance` (`Legal / Compliance`) | `Manager` |
+| **Channel** | `channel` | `Email`, `Chat` (`Chat / Direct Message`), `Announcement`, `Feedback` | `Email` |
+| **Preset** | `preset` | `executive` (`Executive C-Level`), `supportive` (`Supportive Peer`), `legal` (`Legal / Compliance`), `genz` (`Gen-Z Hype`), or `null` | `null` |
+| **Length** | `length` | `shorter` (`Shorter`), `same` (`Same`), `longer` (`Longer`) | `same` |
+| **Word Limit** | `targetWordLimit` or `targetWords` | Integer 1 to 2,000 | None |
+| **Language** | `language` | `English`, `Hindi`, `Hinglish`, `Spanish`, `French`, `German`, `Arabic`, `Japanese` | `English` |
 
 ---
 
@@ -79,33 +71,66 @@ Accept: application/json
 
 ### Success Response (`HTTP 200 OK`)
 
-Returns exactly three distinct rewrite variations.
+Returns exactly three validated versions and communication perception insights:
 
 ```json
 {
+  "status": "success",
   "versions": [
     {
-      "label": "Version 1",
-      "text": "We need to reschedule the quarterly roadmap sync to Friday due to unresolved blocker #102.",
-      "whatChanged": "Replaced informal expressions with direct, outcome-focused phrasing and made the blocker actionable."
+      "id": "v1",
+      "label": "Version 1 — Recommended",
+      "text": "Production deployment is rescheduled for Monday to address an authentication blocker.",
+      "whatChanged": "Condensed into a single outcome-focused line emphasizing decision and blocker.",
+      "styleDescription": "Clear, outcome-focused, and tailored for Executive / C-Level",
+      "tone": "Professional",
+      "audience": "Executive/C-Level"
     },
     {
-      "label": "Version 2",
-      "text": "Please be advised that the quarterly roadmap review has been deferred to Friday to address open issue #102.",
-      "whatChanged": "Structured with formal, professional corporate phrasing suitable for executive visibility."
+      "id": "v2",
+      "label": "Version 2 — More Diplomatic",
+      "text": "Please be advised that the production deployment has been moved to Monday to resolve an authentication issue.",
+      "whatChanged": "Structured with formal, professional corporate phrasing.",
+      "styleDescription": "Softer phrasing emphasizing collaborative commitment",
+      "tone": "Diplomatic",
+      "audience": "Executive/C-Level"
     },
     {
-      "label": "Version 3",
-      "text": "Quick update on the roadmap review: we're shifting our sync to Friday so we can knock out issue #102 first.",
-      "whatChanged": "Adopted an approachable, conversational cadence while preserving all dates and issue references."
+      "id": "v3",
+      "label": "Version 3 — More Concise",
+      "text": "Auth issue identified during pre-release. Deploy deferred to Monday for resolution.",
+      "whatChanged": "Crisp executive bullet style with zero filler.",
+      "styleDescription": "Crisp executive bullet style with zero filler",
+      "tone": "Professional",
+      "audience": "Executive/C-Level"
     }
-  ]
+  ],
+  "insights": {
+    "toneShift": "Draft → Professional",
+    "clarity": "The request is explicit with an exact completion timeline.",
+    "directness": "High executive directness with crisp focus",
+    "audienceFit": "Calibrated register and vocabulary specifically for Executive / C-Level.",
+    "keyChanges": [
+      "Condensed into a single outcome-focused line emphasizing decision and blocker.",
+      "Structured with formal, professional corporate phrasing.",
+      "Crisp executive bullet style with zero filler."
+    ],
+    "howItMightComeAcross": "The revised message sounds professional and respectful, while still communicating the urgency clearly.",
+    "meaningCheck": {
+      "preservedFacts": [
+        "Core intent and message preserved",
+        "Specific dates, figures, and deadlines retained",
+        "Explicit commitments and conditions kept intact"
+      ],
+      "possibleOmissions": [],
+      "unsupportedAdditions": [],
+      "uncertainChanges": []
+    }
+  }
 }
 ```
 
 ### Error Responses
-
-All error responses share a standard JSON structure:
 
 ```json
 {
@@ -113,42 +138,19 @@ All error responses share a standard JSON structure:
     "code": "VALIDATION_ERROR",
     "message": "Draft text cannot be empty or whitespace only.",
     "details": [
-      {
-        "field": "text",
-        "message": "Draft text cannot be empty or whitespace only."
-      }
+      { "field": "text", "message": "Draft text cannot be empty or whitespace only." }
     ]
-  }
+  },
+  "message": "Draft text cannot be empty or whitespace only."
 }
 ```
 
-#### HTTP Status Codes & Error Codes
-
-| Status | Code | Trigger |
-| :--- | :--- | :--- |
-| `400` | `VALIDATION_ERROR` | Empty draft, >2000 words, unsupported enum value, invalid customTone. |
-| `400` | `INVALID_JSON` | Malformed JSON in request body. |
-| `401` | `AUTH_ERROR` | Provided LLM API key was rejected by provider. |
-| `413` | `PAYLOAD_TOO_LARGE` | Request body exceeds 100KB limit. |
-| `429` | `RATE_LIMIT_EXCEEDED` | Client exceeded local Express rate limits. |
-| `429` | `PROVIDER_RATE_LIMIT`| Gemini quota exhausted or upstream rate-limited. |
-| `502` | `PROVIDER_ERROR` | Upstream AI service network error or failure. |
-| `502` | `MODEL_OUTPUT_INVALID`| Model failed to return valid JSON matching the 3-version schema after retry. |
-| `503` | `CONFIG_MISSING` | `LLM_API_KEY` is not configured on the server. |
-| `504` | `PROVIDER_TIMEOUT` | AI provider did not respond within timeout (30 seconds). |
-
 ---
 
-## 5. Client Integration Utilities
+## 5. Client Integration & Metric Formula
 
-Pre-built client utilities are available for the frontend:
-- **`src/services/rewriteApi.js`**: `checkHealth()`, `requestRewrite(params)`
-- **`src/lib/diff.js`**: `computeWordDiff(originalText, rewrittenText)`
-- **`src/lib/metrics.js`**: `computeChangeMetrics(originalText, rewrittenText)`
+- **`src/lib/api.js`**: Frontend API client with fallback and health verification.
+- **`src/lib/diff.js`**: Word-level diff (`calculateDiff` and `computeWordDiff`).
+- **`src/lib/metrics.js`**: `calculateMetrics` and `computeChangeMetrics`:
 
-### Metric Calculation Formula
-```javascript
-changePercent = 100 * (addedWordCount + removedWordCount) / Math.max(originalWordCount, 1)
-lexicalSimilarity = Math.max(0, Math.min(100, Math.round(100 - changePercent)))
-```
-*Note: Lexical similarity reflects surface word-overlap and MUST NOT be conflated with semantic or factual equivalence.*
+$$\text{changePercent} = 100 \times \frac{\text{addedWordCount} + \text{deletedWordCount}}{\max(\text{originalWordCount}, 1)}$$

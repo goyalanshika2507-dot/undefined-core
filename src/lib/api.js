@@ -1,15 +1,12 @@
 /**
  * VibeShift API Client
  * 
- * FRONTEND-ONLY IMPLEMENTATION (Member 1: Agrim)
- * 
- * CONTRACT SPECIFICATION FOR BACKEND INTEGRATION:
- * Dilbahar (Member 2) & Shreya (Member 3): Implement the backend endpoints matching this schema.
- * Anshika (Member 4): Connect this frontend client to the running backend service.
+ * Interacts with the VibeShift Express backend service.
  */
 
-// Default endpoint target. Configurable via environment variable or localStorage.
-const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Default endpoint target: uses relative '/api' so Vite proxy routes seamlessly in dev,
+// or falls back to VITE_API_URL when explicitly configured.
+const DEFAULT_API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const API_CONFIG = {
   baseUrl: localStorage.getItem('vibeshift_api_url') || DEFAULT_API_BASE_URL,
@@ -18,11 +15,11 @@ export const API_CONFIG = {
     regenerateVersion: '/rewrite/version',
     health: '/health',
   },
-  timeoutMs: 15000,
+  timeoutMs: 30000,
 };
 
 /**
- * Updates the API base URL in runtime (useful for Anshika to point to live backend or ngrok).
+ * Updates the API base URL in runtime.
  * @param {string} url 
  */
 export function setApiBaseUrl(url) {
@@ -40,11 +37,11 @@ export function resetApiBaseUrl() {
 
 /**
  * Checks if the backend service is reachable.
- * @returns {Promise<{ isConnected: boolean, message: string }>}
+ * @returns {Promise<{ isConnected: boolean, message: string, data?: object }>}
  */
 export async function checkBackendHealth() {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
   try {
     const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoints.health}`, {
@@ -73,15 +70,16 @@ export async function checkBackendHealth() {
  * 
  * @param {object} payload
  * @param {string} payload.message - The raw draft text
- * @param {string} payload.tone - Selected tone (Professional, Friendly, Diplomatic, Generic)
- * @param {string} payload.audience - Selected audience (Manager, Professor, Teacher, Friend, Executive / C-Level, Legal / Compliance)
- * @param {string} payload.channel - Channel (Email, Chat / Direct Message, Announcement, Feedback)
- * @param {string} payload.length - Length preset (Shorter, Same, Longer)
+ * @param {string} [payload.text] - Alternative draft field
+ * @param {string} payload.tone - Selected tone
+ * @param {string} payload.audience - Selected audience
+ * @param {string} payload.channel - Channel
+ * @param {string} payload.length - Length preset
  * @param {number|null} payload.targetWords - Optional target word count
- * @param {string} payload.language - Output language (English, Hindi, Hinglish, etc.)
+ * @param {string} payload.language - Output language
  * @param {string|null} payload.preset - Optional active vibe preset name
  * 
- * @returns {Promise<object>} Returns structured AI response containing exactly 4 versions and insights
+ * @returns {Promise<object>} Returns structured AI response containing versions and insights
  */
 export async function generateRewrites(payload) {
   const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoints.rewrite}`;
@@ -103,7 +101,9 @@ export async function generateRewrites(payload) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => null);
-      const errorMessage = errorData?.error || `Backend returned error HTTP ${response.status}: ${response.statusText}`;
+      const errorMessage = (typeof errorData?.error === 'string' ? errorData.error : errorData?.error?.message)
+        || errorData?.message
+        || `Backend returned error HTTP ${response.status}: ${response.statusText}`;
       const err = new Error(errorMessage);
       err.status = response.status;
       err.data = errorData;
@@ -128,7 +128,7 @@ export async function generateRewrites(payload) {
       backendError.details = {
         attemptedUrl: url,
         assignedTo: 'Anshika (Integration), Dilbahar & Shreya (Backend)',
-        instructions: 'Start the backend server on the configured port and implement POST /api/rewrite.',
+        instructions: 'Start the backend server on port 5000: `npm run server`',
       };
       throw backendError;
     }
@@ -140,9 +140,7 @@ export async function generateRewrites(payload) {
 /**
  * SAMPLE CONTRACT DATA SPECIFICATION
  * 
- * Strictly provided to visualize and test the frontend UI components during
- * development and hackathon evaluation when the backend is not yet started.
- * Not presented as live AI output.
+ * Provided to preview the frontend UI components during offline development.
  */
 export const SAMPLE_CONTRACT_PREVIEW = {
   status: 'success',
@@ -181,7 +179,7 @@ export const SAMPLE_CONTRACT_PREVIEW = {
     },
   ],
   insights: {
-    toneShift: 'Blunt → Professional',
+    toneShift: 'Draft → Professional',
     clarity: 'The request is explicit with an exact completion timeline.',
     directness: 'Moderate and diplomatic',
     audienceFit: 'Suitable for a professional message to a manager.',

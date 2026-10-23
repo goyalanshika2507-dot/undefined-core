@@ -4,7 +4,7 @@ import { executeRewrite } from '../lib/llm.js';
 
 const router = Router();
 
-router.post('/rewrite', async (req, res, next) => {
+router.post('/rewrite', async (req, res) => {
   const startTime = Date.now();
 
   // 1. Validate request body with Zod
@@ -23,7 +23,8 @@ router.post('/rewrite', async (req, res, next) => {
         code: 'VALIDATION_ERROR',
         message: primaryMessage,
         details: errorDetails
-      }
+      },
+      message: primaryMessage
     });
   }
 
@@ -52,7 +53,8 @@ router.post('/rewrite', async (req, res, next) => {
       error: {
         code,
         message
-      }
+      },
+      message
     });
   }
 });
